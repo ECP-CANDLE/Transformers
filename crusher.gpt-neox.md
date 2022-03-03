@@ -1,0 +1,81 @@
+# Setup GPT-NeoX-20B Env
+
+## Create Conda env
+```
+// install conda3 & initialize first
+
+conda create -y -p /ccs/home/hsyoo/crusher_hackathon/conda_env python=3.8
+conda activate /ccs/home/hsyoo/crusher_hackathon/conda_env
+```
+
+## Install PyTorch (rocm4.5 compatible pytorch provided by HPE)
+```
+pip install torch-1.11.0a0+git3e9e580-cp38-cp38-linux_x86_64.whl
+```
+
+## Install Apex (wheel provided by HPE)
+```
+pip install apex-0.1-cp38-cp38-linux_x86_64.whl
+```
+
+## Dependency install
+### env
+```
+module load rocm/4.5.2 gcc/11.2.0
+
+source /ccs/home/hsyoo/crusher_conda.sh
+conda activate /gpfs/alpine/med106/proj-shared/hsyoo/Crusher/GPTNeoX20B/conda_env
+
+export TORCH_EXTENSIONS_DIR=/ccs/home/hsyoo/crusher_neox/pytorch_extensions/
+export MAX_JOBS=64
+export HCC_AMDGPU_TARGET=gfx90a
+
+export LD_PRELOAD="/opt/cray/pe/gcc/11.2.0/snos/lib64/libstdc++.so.6 /gpfs/alpine/world-shared/bip214/rocm_smi_lib/build/rocm_smi/librocm_smi64.so"
+export LD_PRELOAD="${LD_PRELOAD} ${CRAY_MPICH_ROOTDIR}/gtl/lib/libmpi_gtl_hsa.so"
+```
+
+###  DeeperSpeed
+```
+git clone https://github.com/EleutherAI/DeeperSpeed.git && cd DeeperSpeed
+pip install -r requirements/requirements.txt
+./install.sh
+cd ..
+```
+
+### GPT-NeoX
+```
+git clone https://github.com/EleutherAI/gpt-neox.git && cd gpt-neox
+// comment out deeperspeed and mpi4py in requirements/requirements.txt
+pip install -r requirements/requirements.txt
+
+// checkout changes at https://github.com/hyoo/gpt-neox/commit/fec19db0c21c141c621a771f49ea2a74301ae48f
+// for fused kernels
+```
+
+# Testing setup
+```
+#!/bin/bash
+
+#SBATCH -A MED106_crusher
+#SBATCH -N 1
+#SBATCH -t 00:30:00
+#SBATCH -J GPT_neox
+#SBATCH -o %x-%j.out
+#SBATCH -p batch
+
+set +x
+module load rocm/4.5.2 gcc/11.2.0
+
+source /ccs/home/hsyoo/crusher_conda.sh
+conda activate /gpfs/alpine/med106/proj-shared/hsyoo/Crusher/GPTNeoX20B/conda_env
+
+export TORCH_EXTENSIONS_DIR=/ccs/home/hsyoo/crusher_neox/pytorch_extensions/
+export MAX_JOBS=64
+export HCC_AMDGPU_TARGET=gfx90a
+
+export LD_PRELOAD="/opt/cray/pe/gcc/11.2.0/snos/lib64/libstdc++.so.6 /gpfs/alpine/world-shared/bip214/rocm_smi_lib/build/rocm_smi/librocm_smi64.so"
+export LD_PRELOAD="${LD_PRELOAD} ${CRAY_MPICH_ROOTDIR}/gtl/lib/libmpi_gtl_hsa.so"
+
+# train
+python deepy.py train.py -d configs small.yml local_setup.yml
+```
